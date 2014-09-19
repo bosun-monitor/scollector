@@ -7,6 +7,7 @@ import (
 	"github.com/StackExchange/scollector/metadata"
 	"github.com/StackExchange/scollector/opentsdb"
 	"github.com/StackExchange/scollector/util"
+	"github.com/StackExchange/slog"
 )
 
 func init() {
@@ -74,6 +75,20 @@ func c_ifstat_linux() (opentsdb.MultiDataPoint, error) {
 		}
 		intf := m[1]
 		stats := strings.Fields(m[2])
+
+		// Detect speed of the interface in question
+		errspeed := readLine("/sys/class/net/"+intf+"/speed", func(speed string) error {
+			Add(&md, "linux.net.ifspeed", speed, opentsdb.TagSet{
+				"iface": intf},
+				metadata.Gauge, metadata.Megabit, "")
+			Add(&md, "os.net.ifspeed", speed, opentsdb.TagSet{
+				"iface": intf},
+				metadata.Gauge, metadata.Megabit, "")
+			return nil
+		})
+		if errspeed != nil {
+			slog.Info("Error reading interface speed: " + errspeed.Error())
+		}
 		for i, v := range stats {
 			if strings.HasPrefix(intf, "bond") {
 				Add(&md, "linux.net.bond."+strings.Replace(FIELDS_NET[i], ".", "_", -1), v, opentsdb.TagSet{
