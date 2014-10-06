@@ -32,6 +32,7 @@ const (
 	Bytes               = "bytes"
 	BytesPerSecond      = "bytes per second"
 	C                   = "C" // Celsius
+	ResponseCode        = "ResponseCode"
 	Count               = ""
 	Event               = ""
 	MHz                 = "MHz"     // MegaHertz
