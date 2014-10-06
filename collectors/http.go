@@ -71,12 +71,17 @@ func c_http_check(h []string) (opentsdb.MultiDataPoint, error) {
 		req.Header = headers
 		req.Host = host
 		if hh := headers.Get("Host"); hh != "" {
-			//Setting host header doesn't work
+			// Setting host header directly doesn't work with client requests - so set .Host instead
 			req.Host = hh
+		}
+		ts := opentsdb.TagSet{"dst_host": req.Host, "ip": strings.Replace(ip, ":", ".", -1)}
+		if len(h) > 1 {
+			ts["route"] = h[1]
 		}
 		st := time.Now()
 		resp, err := cli.Do(&req)
 		if err != nil {
+			Add(&md, "http.check.failed", 1, ts, metadata.Gauge, metadata.Bool, "")
 			return md, nil
 		}
 		d := time.Now().Sub(st)
@@ -84,15 +89,13 @@ func c_http_check(h []string) (opentsdb.MultiDataPoint, error) {
 		if err != nil {
 			log.Println(err)
 		}
-		//TODO This won't work with IPv6 due to colons
-		ts := opentsdb.TagSet{"dst_host": req.Host, "ip": ip}
-		if len(h) > 1 {
-			fmt.Println(h[1])
-			ts["route"] = h[1]
-		}
+		// Until OpenTSDB supports NaN, some of these will go unknown on timeout. This is because
+		// any number would throw off reductions. https://github.com/OpenTSDB/opentsdb/issues/183
 		Add(&md, "http.check.response_time", d.Seconds()*1000, ts, metadata.Gauge, metadata.MilliSecond, "")
 		Add(&md, "http.check.response_code", resp.StatusCode, ts, metadata.Gauge, metadata.ResponseCode, "")
+		Add(&md, "http.check.failed", 0, ts, metadata.Gauge, metadata.Bool, "")
 		if len(h) > 2 {
+			metadata.AddMeta("http.check.string_found", ts, "search_string", h[2], false)
 			var b int
 			if strings.Contains(string(body), h[2]) {
 				b = 1
