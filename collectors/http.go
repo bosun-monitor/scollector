@@ -26,9 +26,11 @@ func HTTP(h []string) {
 
 func c_http_check(h []string) (opentsdb.MultiDataPoint, error) {
 	var md opentsdb.MultiDataPoint
+	if len(h) < 1 {
+		return md, fmt.Errorf("http-check needs at least a url")
+	}
 	u, err := url.Parse(h[0])
 	if err != nil {
-		log.Println(err)
 		return md, err
 	}
 	headers := make(http.Header)
@@ -54,17 +56,15 @@ func c_http_check(h []string) (opentsdb.MultiDataPoint, error) {
 	if err != nil {
 		log.Println(err)
 	}
-	cli := &http.Client{}
-	cli.Timeout = time.Second * 30
+	cli := &http.Client{Timeout: time.Second * 30}
 	for _, ip := range ips {
 		var req http.Request
-		nu := u
 		nh := []string{ip}
 		if port != "" {
 			nh = append(nh, port)
 		}
-		nu.Host = strings.Join(nh, ":")
-		req.URL = nu
+		u.Host = strings.Join(nh, ":")
+		req.URL = u
 		if headers.Get("User-Agent") == "" {
 			headers.Set("User-Agent", "bosun (StackExchange)")
 		}
