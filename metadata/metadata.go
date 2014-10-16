@@ -30,6 +30,7 @@ const (
 	A                   = "A" // Amps
 	Bool                = "bool"
 	Bytes               = "bytes"
+	KBytes              = "kbytes"
 	BytesPerSecond      = "bytes per second"
 	C                   = "C" // Celsius
 	ResponseCode        = "ResponseCode"
@@ -41,10 +42,12 @@ const (
 	PerSecond           = "per second"
 	RPM                 = "RPM" // Rotations per minute.
 	Second              = "seconds"
+	StatusCode          = "status code"
 	MilliSecond         = "milliseconds"
 	V                   = "V" // Volts
 	V_10                = "tenth-Volts"
 	Megabit             = "Mbit"
+	Operation           = "Operations"
 )
 
 type Metakey struct {
@@ -117,6 +120,7 @@ type Metasend struct {
 	Tags   opentsdb.TagSet `json:",omitempty"`
 	Name   string          `json:",omitempty"`
 	Value  interface{}
+	Time   time.Time `json:",omitempty"`
 }
 
 func sendMetadata() {
