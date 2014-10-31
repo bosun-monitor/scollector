@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -90,12 +91,26 @@ func readConf() {
 			f(flagICMP)
 		case "vsphere":
 			f(flagVsphere)
+		case "http-check":
+			registerHttp(v)
 		default:
 			if *flagDebug {
 				slog.Errorf("unknown key in %v:%v", p, i+1)
 			}
 		}
 	}
+}
+
+func registerHttp(s string) {
+	c := csv.NewReader(strings.NewReader(s))
+	f, err := c.Read()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(f) < 1 {
+		log.Fatal(fmt.Errorf("expected at least 1 field got %v for line: %v", len(f), s))
+	}
+	collectors.HTTP(f)
 }
 
 func main() {

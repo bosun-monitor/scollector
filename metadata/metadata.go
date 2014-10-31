@@ -33,6 +33,7 @@ const (
 	KBytes              = "kbytes"
 	BytesPerSecond      = "bytes per second"
 	C                   = "C" // Celsius
+	ResponseCode        = "ResponseCode"
 	Count               = ""
 	Event               = ""
 	Entropy             = "entropy"
