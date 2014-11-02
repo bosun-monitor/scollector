@@ -10,11 +10,29 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/StackExchange/scollector/metadata"
 	"github.com/StackExchange/scollector/opentsdb"
 )
 
-func init() {
-	collectors = append(collectors, &IntervalCollector{F: c_linux_processes})
+var conf []WatchedProcess
+
+// LinuxProcesses registers the LinuxProcesses collector.
+func LinuxProcesses(raw_conf []string) error {
+	for _, cs := range raw_conf {
+		s := strings.SplitN(cs, ",", 4)
+		if len(s) != 3 {
+			return fmt.Errorf("not enough arguments for the linux process collector with %s", cs)
+		}
+		conf = append(conf, *NewWatchedProcess(s[0], s[1], s[2]))
+	}
+
+	collectors = append(collectors, &IntervalCollector{
+		F: func() (opentsdb.MultiDataPoint, error) {
+			return c_linux_processes(conf)
+		},
+		name: "linux_processes",
+	})
+	return nil
 }
 
 //Will move this to collectors since this is something that should be reusable
@@ -45,9 +63,50 @@ func (i *IDPool) Put(v int) {
 type WatchedProcess struct {
 	Command   string
 	Name      string
-	Processes map[string]LinuxProcess
-	Argmatch  regexp.Regexp
+	Processes map[string]int
+	ArgMatch  regexp.Regexp
 	*IDPool
+}
+
+func (w *WatchedProcess) Check(l *LinuxProcess) {
+	if _, ok := w.Processes[l.Pid]; ok {
+		return
+	}
+	if !strings.Contains(l.Command, w.Command) {
+		return
+	}
+	if w.ArgMatch.MatchString(l.Arguments) {
+		w.Processes[l.Pid] = w.Get()
+	}
+}
+
+func (w *WatchedProcess) Remove(pid string) {
+	w.Put(w.Processes[pid])
+	delete(w.Processes, pid)
+}
+
+func (w *WatchedProcess) Monitor(md *opentsdb.MultiDataPoint) {
+	for pid, id := range w.Processes {
+		stats_file, err := ioutil.ReadFile("/proc/" + pid + "/stat")
+		if err != nil {
+			w.Remove(pid)
+			return
+		}
+		io_file, err := ioutil.ReadFile("/proc/" + pid + "/io")
+		if err != nil {
+			w.Remove(pid)
+			return
+		}
+		stats := strings.Fields(string(stats_file))
+		var io []string
+		for _, line := range strings.Split(string(io_file), "\n") {
+			f := strings.Fields(line)
+			if len(f) == 2 {
+				io = append(io, f[1])
+			}
+		}
+		Add(md, "linux.proc.cpu", stats[13], opentsdb.TagSet{"type": "user", "name": w.Name, "id": strconv.Itoa(id)}, metadata.Counter, metadata.Pct, "")
+	}
 }
 
 func NewWatchedProcess(command, name, argmatch string) *WatchedProcess {
@@ -55,8 +114,8 @@ func NewWatchedProcess(command, name, argmatch string) *WatchedProcess {
 	return &WatchedProcess{
 		Command:   command,
 		Name:      name,
-		Processes: make(map[string]LinuxProcess),
-		Argmatch:  *r,
+		Processes: make(map[string]int),
+		ArgMatch:  *r,
 		IDPool:    NewIDPool(),
 	}
 }
@@ -64,7 +123,7 @@ func NewWatchedProcess(command, name, argmatch string) *WatchedProcess {
 type LinuxProcess struct {
 	Pid       string
 	Command   string
-	Arguments []string
+	Arguments string
 }
 
 func GetLinuxProccesses() ([]LinuxProcess, error) {
@@ -94,21 +153,26 @@ func GetLinuxProccesses() ([]LinuxProcess, error) {
 			Command: cl[0],
 		}
 		if len(cl) > 1 {
-			for _, arg := range cl[1:] {
-				lp.Arguments = append(lp.Arguments, arg)
-			}
+			lp.Arguments = strings.Join(cl[1:], "")
 		}
 		lps = append(lps, lp)
 	}
 	return lps, nil
 }
 
-func c_linux_processes() (opentsdb.MultiDataPoint, error) {
+func c_linux_processes(conf []WatchedProcess) (opentsdb.MultiDataPoint, error) {
 	var md opentsdb.MultiDataPoint
-	pids, err := GetLinuxProccesses()
+	lps, err := GetLinuxProccesses()
 	if err != nil {
 		return nil, nil
 	}
-	fmt.Println(pids)
+	for _, w := range conf {
+		for _, lp := range lps {
+			w.Check(&lp)
+		}
+	}
+	for _, w := range conf {
+		w.Monitor(&md)
+	}
 	return md, nil
 }
