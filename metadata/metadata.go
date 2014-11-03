@@ -36,6 +36,7 @@ const (
 	Count               = ""
 	Event               = ""
 	Entropy             = "entropy"
+	Fault               = "faults"
 	CHz                 = "CentiHertz"
 	ContextSwitch       = "context switches"
 	Interupt            = "interupts"
@@ -50,6 +51,7 @@ const (
 	Second              = "seconds"
 	Socket              = "sockets"
 	StatusCode          = "status code"
+	Syscall             = "syscalls"
 	MilliSecond         = "milliseconds"
 	V                   = "V" // Volts
 	V_10                = "tenth-Volts"
