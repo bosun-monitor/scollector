@@ -28,6 +28,9 @@ var (
 	// BatchSize is the maximum length of data points sent at once to OpenTSDB.
 	BatchSize = 250
 
+	// IgnoreDuplicate is the duration of time to not re-send duplicate data.
+	IgnoreDuplicate = time.Minute * 10
+
 	// Debug enables debug logging.
 	Debug = false
 
@@ -36,6 +39,9 @@ var (
 
 	// Sent is the number of sent data points.
 	sent int64
+
+	// Duplicate is the number of duplicate points that were skipped.
+	duplicate int64
 
 	tchan               chan *opentsdb.DataPoint
 	tsdbURL             string
@@ -84,27 +90,7 @@ func InitChan(tsdbhost *url.URL, metric_root string, ch chan *opentsdb.DataPoint
 	tsdbURL = u.String()
 	metricRoot = metric_root + "."
 	tchan = ch
-	go func() {
-		for dp := range tchan {
-			qlock.Lock()
-			for {
-				if len(queue) > MaxQueueLen {
-					slock.Lock()
-					dropped++
-					slock.Unlock()
-					break
-				}
-				queue = append(queue, dp)
-				select {
-				case dp = <-tchan:
-					continue
-				default:
-				}
-				break
-			}
-			qlock.Unlock()
-		}
-	}()
+	go queuer()
 	go send()
 
 	go collect()
@@ -117,6 +103,12 @@ func InitChan(tsdbhost *url.URL, metric_root string, ch chan *opentsdb.DataPoint
 	Set("collect.sent", nil, func() (i interface{}) {
 		slock.Lock()
 		i = sent
+		slock.Unlock()
+		return
+	})
+	Set("collect.duplicate", nil, func() (i interface{}) {
+		slock.Lock()
+		i = duplicate
 		slock.Unlock()
 		return
 	})

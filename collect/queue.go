@@ -12,6 +12,45 @@ import (
 	"github.com/StackExchange/slog"
 )
 
+func queuer() {
+	type sentValue struct {
+		time time.Time
+		val  interface{}
+	}
+	sent := make(map[string]*sentValue)
+	for dp := range tchan {
+		qlock.Lock()
+		since := time.Now().Add(-IgnoreDuplicate)
+		for {
+			if len(queue) > MaxQueueLen {
+				slock.Lock()
+				dropped++
+				slock.Unlock()
+				break
+			}
+			key := dp.Metric + dp.Tags.String()
+			if prev, ok := sent[key]; ok && prev.val == dp.Value && prev.time.After(since) {
+				slock.Lock()
+				duplicate++
+				slock.Unlock()
+			} else {
+				sent[key] = &sentValue{
+					time: time.Now(),
+					val:  dp.Value,
+				}
+				queue = append(queue, dp)
+			}
+			select {
+			case dp = <-tchan:
+				continue
+			default:
+			}
+			break
+		}
+		qlock.Unlock()
+	}
+}
+
 func send() {
 	for {
 		qlock.Lock()
