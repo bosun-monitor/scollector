@@ -46,6 +46,8 @@ var (
 	flagDisableMetadata = flag.Bool("m", false, "Disable sending of metadata.")
 	flagVersion         = flag.Bool("version", false, `Prints the version and exits.`)
 
+	confLinuxProcess = make([]string, 0)
+
 	mains []func()
 )
 
@@ -90,6 +92,8 @@ func readConf() {
 			f(flagICMP)
 		case "vsphere":
 			f(flagVsphere)
+		case "linux_process":
+			confLinuxProcess = append(confLinuxProcess, v)
 		default:
 			if *flagDebug {
 				slog.Errorf("unknown key in %v:%v", p, i+1)
@@ -153,6 +157,11 @@ func main() {
 	}
 	if *flagFake > 0 {
 		collectors.InitFake(*flagFake)
+	}
+	if len(confLinuxProcess) > 0 {
+		if err := collectors.LinuxProcesses(confLinuxProcess); err != nil {
+			log.Fatal(err)
+		}
 	}
 	collect.Debug = *flagDebug
 	c := collectors.Search(*flagFilter)
