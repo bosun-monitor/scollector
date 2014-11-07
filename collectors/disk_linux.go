@@ -60,6 +60,7 @@ func removable(major, minor string) bool {
 }
 
 var sdiskRE = regexp.MustCompile(`/dev/(sd[a-z])[0-9]?`)
+var sdfSplitRE = regexp.MustCompile("\\s+")
 
 func removable_fs(name string) bool {
 	s := sdiskRE.FindStringSubmatch(name)
@@ -136,9 +137,7 @@ func c_iostat_linux() (opentsdb.MultiDataPoint, error) {
 func c_dfstat_blocks_linux() (opentsdb.MultiDataPoint, error) {
 	var md opentsdb.MultiDataPoint
 	err := util.ReadCommand(func(line string) error {
-		fields := strings.Fields(line)
-		// TODO: support mount points with spaces in them. They mess up the field order
-		// currently due to df's columnar output.
+		fields := sdfSplitRE.Split(line,6)
 		if len(fields) != 6 || !IsDigit(fields[2]) {
 			return nil
 		}
