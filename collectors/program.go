@@ -78,21 +78,18 @@ func isExecutable(f os.FileInfo) bool {
 }
 
 func (c *ProgramCollector) Run(dpchan chan<- *opentsdb.DataPoint) {
-	if c.Interval == 0 {
-		for {
-			next := time.After(DefaultFreq)
-			if err := c.runProgram(dpchan); err != nil {
-				slog.Infoln(err)
-			}
-			<-next
-			slog.Infoln("restarting", c.Path)
+	var interval = DefaultFreq
+	if c.Interval != 0 {
+		interval = c.Interval
+	}
+
+	for {
+		next := time.After(interval)
+		if err := c.runProgram(dpchan); err != nil {
+			slog.Infoln(err)
 		}
-	} else {
-		for {
-			next := time.After(c.Interval)
-			c.runProgram(dpchan)
-			<-next
-		}
+		<-next
+		slog.Infoln("restarting", c.Path)
 	}
 }
 
