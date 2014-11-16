@@ -27,6 +27,7 @@ func ICMP(host string) {
 
 func c_icmp(host string) (opentsdb.MultiDataPoint, error) {
 	var md opentsdb.MultiDataPoint
+
 	p := fastping.NewPinger()
 	ra, err := net.ResolveIPAddr("ip4:icmp", host)
 	if err != nil {
@@ -35,13 +36,15 @@ func c_icmp(host string) (opentsdb.MultiDataPoint, error) {
 	p.AddIPAddr(ra)
 	p.MaxRTT = time.Second * 5
 	timeout := 1
-	p.AddHandler("receive", func(addr *net.IPAddr, t time.Duration) {
+	p.OnRecv = func(addr *net.IPAddr, t time.Duration) {
 		Add(&md, "ping.rtt", float64(t)/float64(time.Millisecond), opentsdb.TagSet{"dst_host": host}, metadata.Unknown, metadata.None, "")
 		timeout = 0
-	})
+	}
+
 	if err := p.Run(); err != nil {
 		return nil, err
 	}
+
 	Add(&md, "ping.timeout", timeout, opentsdb.TagSet{"dst_host": host}, metadata.Unknown, metadata.None, "")
 	return md, nil
 }
