@@ -182,6 +182,18 @@ func c_omreport_fans() (opentsdb.MultiDataPoint, error) {
 	return md, nil
 }
 
+func omreport_memory_failure(index string, ts opentsdb.TagSet) {
+	readOmreport(func(fields []string) {
+		if len(fields) != 2 {
+			return
+		}
+		if fields[0] != "Failures" {
+			return
+		}
+		metadata.AddMeta("", ts, "memory_failure", clean(fields[1]), true)
+	}, "chassis", "memory", fmt.Sprintf("index=%v", index))
+}
+
 func c_omreport_memory() (opentsdb.MultiDataPoint, error) {
 	var md opentsdb.MultiDataPoint
 	readOmreport(func(fields []string) {
@@ -194,6 +206,9 @@ func c_omreport_memory() (opentsdb.MultiDataPoint, error) {
 		ts := opentsdb.TagSet{"name": replace(fields[2])}
 		Add(&md, "hw.chassis.memory", severity(fields[1]), ts, metadata.Gauge, metadata.Ok, "")
 		metadata.AddMeta("", ts, "memory", clean(fields[4]), true)
+		if severity(fields[1]) == 1 {
+			omreport_memory_failure(fields[0], ts)
+		}
 	}, "chassis", "memory")
 	return md, nil
 }
